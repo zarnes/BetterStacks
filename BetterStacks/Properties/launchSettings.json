@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "BetterStacks": {
+      "commandName": "Project",
+      "commandLineArgs": "/nologo"
+    }
+  }
+}
