@@ -7,16 +7,18 @@ using Il2CppScheduleOne.ObjectScripts;
 using MelonLoader.Utils;
 using Newtonsoft.Json;
 using Il2CppScheduleOne.UI.Phone.Delivery;
+using Il2CppScheduleOne.UI.Stations;
+using Il2CppScheduleOne.UI.Shop;
 
-[assembly: MelonInfo(typeof(BetterStacksMod), "Better Stacks", "1.0.0", "Zarnes")]
+[assembly: MelonInfo(typeof(BetterStacksMod), "Better Stacks", "2.0.0", "Zarnes")]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
 namespace BetterStacks;
 
 public class BetterStacksMod : MelonMod
 {
-    private const int STACK_CAP = 200;
     private static ModConfig _config = new ModConfig();
+    private static HashSet<ItemDefinition> _alreadyModifiedItems = new HashSet<ItemDefinition>();
 
     public override void OnInitializeMelon()
     {
@@ -31,28 +33,34 @@ public class BetterStacksMod : MelonMod
         );
 
         // Patch SetQuantity
-        harmony.Patch(
-            AccessTools.Method(typeof(ItemInstance), "SetQuantity"),
-            prefix: new HarmonyMethod(typeof(BetterStacksMod), nameof(SetQuantityPatch))
-        );
+        //harmony.Patch(
+        //    AccessTools.Method(typeof(ItemInstance), "SetQuantity"),
+        //    prefix: new HarmonyMethod(typeof(BetterStacksMod), nameof(SetQuantityPatch))
+        //);
 
         // Patch ChangeQuantity
-        harmony.Patch(
-            AccessTools.Method(typeof(ItemInstance), "ChangeQuantity"),
-            prefix: new HarmonyMethod(typeof(BetterStacksMod), nameof(ChangeQuantityPatch))
-        );
+        //harmony.Patch(
+        //    AccessTools.Method(typeof(ItemInstance), "ChangeQuantity"),
+        //    prefix: new HarmonyMethod(typeof(BetterStacksMod), nameof(ChangeQuantityPatch))
+        //);
 
-        // Patch MixingStation Start
+        // Patch Mixing Station capacity
         harmony.Patch(
             AccessTools.Method(typeof(MixingStation), "Start"),
-            prefix: new HarmonyMethod(typeof(BetterStacksMod), nameof(MixingStationStartPath))
+            prefix: new HarmonyMethod(typeof(BetterStacksMod), nameof(PatchMixingStationCapacity))
         );
 
-        // Patch DeliveryShop CanOrder
-        //harmony.Patch(
-        //    AccessTools.Method(typeof(DeliveryShop), "CanOrder"),
-        //    prefix: new HarmonyMethod(typeof(BetterStacksMod), nameof(CanOrderPatch))
-        //);
+        // Patch Drying Rack capacity
+        harmony.Patch(
+            AccessTools.Method(typeof(DryingRackCanvas), "SetIsOpen"),
+            prefix: new HarmonyMethod(typeof(BetterStacksMod), nameof(PatchDryingRackCapacity))
+        );
+
+        //Patch Delivery stack limit
+        harmony.Patch(
+            AccessTools.Method(typeof(ListingEntry), "Initialize"),
+            postfix: new HarmonyMethod(typeof(BetterStacksMod), nameof(InitializeListingEntryPatch))
+        );
     }
 
     public static ModConfig LoadConfig()
@@ -73,63 +81,28 @@ public class BetterStacksMod : MelonMod
 
     private static void StackLimitPatch(ItemInstance __instance, ref int __result)
     {
-        EItemCategory cat = __instance.Category;
-        switch (cat)
+        if (!_alreadyModifiedItems.Contains(__instance.Definition))
         {
-            case EItemCategory.Product:
-                __result *= _config.Product;
-                break;
-            case EItemCategory.Packaging:
-                __result *= _config.Packaging;
-                break;
-            case EItemCategory.Growing:
-                __result *= _config.Growing;
-                break;
-            case EItemCategory.Tools:
-                __result *= _config.Tools;
-                break;
-            case EItemCategory.Furniture:
-                __result *= _config.Furniture;
-                break;
-            case EItemCategory.Lighting:
-                __result *= _config.Lighting;
-                break;
-            case EItemCategory.Cash:
-                __result *= _config.Cash;
-                break;
-            case EItemCategory.Consumable:
-                __result *= _config.Consumable;
-                break;
-            case EItemCategory.Equipment:
-                __result *= _config.Equipment;
-                break;
-            case EItemCategory.Ingredient:
-                __result *= _config.Ingredient;
-                break;
-            case EItemCategory.Decoration:
-                __result *= _config.Decoration;
-                break;
-            case EItemCategory.Clothing:
-                __result *= _config.Clothing;
-                break;
+            EItemCategory cat = __instance.Category;
+            __result *= GetCapacityModifier(cat);
         }
     }
 
-    private static bool SetQuantityPatch(ItemInstance __instance, int quantity)
-    {
-        int stackLimit = __instance.StackLimit;
-        //MelonLogger.Msg($"SetQuantity called on {__instance.Name}, stack limit is {stackLimit}");
+    //private static bool SetQuantityPatch(ItemInstance __instance, int quantity)
+    //{
+    //    int stackLimit = __instance.StackLimit;
+    //    //MelonLogger.Msg($"SetQuantity called on {__instance.Name}, stack limit is {stackLimit}");
 
-        if (quantity < 0)
-        {
-            MelonLogger.Error("SetQuantity called with negative quantity");
-            return false;
-        }
-        quantity = Math.Min(quantity, stackLimit);
-        __instance.Quantity = quantity;
-        __instance.InvokeDataChange();
-        return false;
-    }
+    //    if (quantity < 0)
+    //    {
+    //        MelonLogger.Error("SetQuantity called with negative quantity");
+    //        return false;
+    //    }
+    //    quantity = Math.Min(quantity, stackLimit);
+    //    __instance.Quantity = quantity;
+    //    __instance.InvokeDataChange();
+    //    return false;
+    //}
 
     private static bool ChangeQuantityPatch(ItemInstance __instance, int change)
     {
@@ -144,18 +117,86 @@ public class BetterStacksMod : MelonMod
         return false;
     }
 
-    public static bool MixingStationStartPath(MixingStation __instance)
+    public static bool PatchMixingStationCapacity(MixingStation __instance)
     {
-        __instance.MixTimePerItem = 1;
-        __instance.MaxMixQuantity = STACK_CAP;
+        __instance.MixTimePerItem /= _config.MixingStationSpeed;
+        __instance.MaxMixQuantity = __instance.MaxMixQuantity * _config.MixingStationCapacity;
+        //MelonLogger.Msg($"Set mixing station capacity to {__instance.MaxMixQuantity}");
         return true;
     }
 
-    //public static bool CanOrderPatch(DeliveryShop __instance, ref string reason)
-    //{
-    //    reason = "";
-    //    return true;
-    //}
+    public static void PatchDryingRackCapacity(DryingRackCanvas __instance, DryingRack rack, bool open)
+    {
+        //MelonLogger.Msg($"On DryingRackCanvas.SetIsOpen");
+        if (rack is not null && rack.ItemCapacity != _config.Product)
+        {
+            rack.ItemCapacity = _config.DryingRackCapacity * 20;
+            //MelonLogger.Msg($"Set drying rack capacity to {rack.ItemCapacity}");
+        }
+    }
+
+    public static bool DeliveryLimitPatch(DeliveryShop __instance)
+    {
+        int totalStacks = 0;
+        foreach (ListingEntry? listingEntry in __instance.listingEntries._items)
+        {
+            if (listingEntry is null || listingEntry.SelectedQuantity == 0)
+                continue;
+
+            StorableItemDefinition item = listingEntry.MatchingListing.Item;
+            int stackCapacity = item.StackLimit * GetCapacityModifier(item.Category);
+            int stacksNeeded = (int) Math.Ceiling((double)listingEntry.SelectedQuantity / stackCapacity);
+            totalStacks += stacksNeeded;
+        }
+
+        MelonLogger.Msg($"Order need {totalStacks} stacks");
+        return totalStacks <= DeliveryShop.DELIVERY_VEHICLE_SLOT_CAPACITY;
+    }
+
+    public static void InitializeListingEntryPatch(ListingEntry __instance, ShopListing match)
+    {
+        StorableItemDefinition item = __instance.MatchingListing.Item;
+        if (!_alreadyModifiedItems.Contains(item))
+        {
+            _alreadyModifiedItems.Add(item);
+            int originalStackLimit = item.StackLimit;
+            item.StackLimit = originalStackLimit * GetCapacityModifier(item.Category);
+            MelonLogger.Msg($"Set {item.Name} shop listing stack limit from {originalStackLimit} to {item.StackLimit}");
+        }
+    }
+
+    private static int GetCapacityModifier(EItemCategory category)
+    {
+        switch (category)
+        {
+            case EItemCategory.Product:
+                return _config.Product;
+            case EItemCategory.Packaging:
+                return _config.Packaging;
+            case EItemCategory.Growing:
+                return _config.Growing;
+            case EItemCategory.Tools:
+                return _config.Tools;
+            case EItemCategory.Furniture:
+                return _config.Furniture;
+            case EItemCategory.Lighting:
+                return _config.Lighting;
+            case EItemCategory.Cash:
+                return _config.Cash;
+            case EItemCategory.Consumable:
+                return _config.Consumable;
+            case EItemCategory.Equipment:
+                return _config.Equipment;
+            case EItemCategory.Ingredient:
+                return _config.Ingredient;
+            case EItemCategory.Decoration:
+                return _config.Decoration;
+            case EItemCategory.Clothing:
+                return _config.Clothing;
+            default:
+                return 1;
+        }
+    }
 }
 
 public class ModConfig
@@ -172,4 +213,9 @@ public class ModConfig
     public int Ingredient { get; set; } = 1;
     public int Decoration { get; set; } = 1;
     public int Clothing { get; set; } = 1;
+
+    public int MixingStationCapacity { get; set; } = 1;
+    public int MixingStationSpeed { get; set; } = 3;
+
+    public int DryingRackCapacity { get; set; } = 1;
 }

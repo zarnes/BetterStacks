@@ -1,14 +1,18 @@
 {
-"Product": 1,
-"Packaging": 10,
+"Product": 2,
+"Packaging": 3,
 "Growing": 1,
 "Tools": 1,
 "Furniture": 1,
 "Lighting": 1,
 "Cash": 1,
-"Consumable": 1,
+"Consumable": 10,
 "Equipment": 1,
 "Ingredient": 10,
 "Decoration": 1,
-"Clothing": 1
+"Clothing": 1,
+
+"MixingStationCapacity": 2,
+"MixingStationSpeed": 3,
+"DryingRackCapacity": 2,
 }
