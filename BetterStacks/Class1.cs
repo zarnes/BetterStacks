@@ -9,6 +9,8 @@ using Newtonsoft.Json;
 using Il2CppScheduleOne.UI.Phone.Delivery;
 using Il2CppScheduleOne.UI.Stations;
 using Il2CppScheduleOne.UI.Shop;
+using Il2CppScheduleOne.Money;
+using Il2CppScheduleOne.ObjectScripts.Cash;
 
 [assembly: MelonInfo(typeof(BetterStacksMod), "Better Stacks", "2.0.0", "Zarnes")]
 [assembly: MelonGame("TVGS", "Schedule I")]
@@ -61,7 +63,45 @@ public class BetterStacksMod : MelonMod
             AccessTools.Method(typeof(ListingEntry), "Initialize"),
             postfix: new HarmonyMethod(typeof(BetterStacksMod), nameof(InitializeListingEntryPatch))
         );
+
+        // Cash Slot Add Item
+        //harmony.Patch(
+        //    AccessTools.Method(typeof(CashSlot), "AddItem"),
+        //    postfix: new HarmonyMethod(typeof(BetterStacksMod), nameof(Patch_CashSlot_AddItem))
+        //);
+        //harmony.Patch(
+        //    AccessTools.Method(typeof(CashSlot), "AddItem"),
+        //    postfix: new HarmonyMethod(typeof(BetterStacksMod), nameof(Patch_CashSlot_AddItem2))
+        //);
+
+        //// Item Slot Add Item STACKOVERFLOW /!\
+        //harmony.Patch(
+        //    AccessTools.Method(typeof(ItemSlot), "AddItem"),
+        //    postfix: new HarmonyMethod(typeof(BetterStacksMod), nameof(Patch_ItemSlot_AddItem))
+        //);
+
     }
+
+    // TODO move
+    //public static void Patch_CashSlot_AddItem(CashSlot __instance, ItemInstance item, bool _internal = false)
+    //{
+    //    MelonLogger.Msg($"Patch_CashSlot_AddItem on type {__instance.GetType().Name}");
+    //}
+
+    //public static void Patch_CashSlot_AddItem2(ItemSlot __instance, ItemInstance item, bool _internal = false)
+    //{
+    //    MelonLogger.Msg($"Patch_CashSlot_AddItem2 on type {__instance.GetType().Name}");
+    //}
+
+    //public static void Patch_ItemSlot_AddItem(ItemSlot __instance, ItemInstance item, bool _internal = false)
+    //{
+    //    MelonLogger.Msg($"Patch_ItemSlot_AddItem on type {__instance.GetType().Name}");
+    //}
+
+    //public static void Patch_ItemSlot_AddItemINVALID(CashSlot __instance, ItemInstance item, bool _internal = false)
+    //{
+    //    MelonLogger.Msg("Patch_CashSlot_AddItem");
+    //}
 
     public static ModConfig LoadConfig()
     {
@@ -85,6 +125,15 @@ public class BetterStacksMod : MelonMod
         {
             EItemCategory cat = __instance.Category;
             __result *= GetCapacityModifier(cat);
+            //if (__instance.Name == "Cash") // TODO remove
+            //{
+            //    __result *= 2;
+            //}
+            //else
+            //{
+            //    __result *= GetCapacityModifier(cat);
+            //}
+            //MelonLogger.Msg($"{__instance.Name} stack modified to {__result}");
         }
     }
 
