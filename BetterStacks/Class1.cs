@@ -9,8 +9,10 @@ using Newtonsoft.Json;
 using Il2CppScheduleOne.UI.Phone.Delivery;
 using Il2CppScheduleOne.UI.Stations;
 using Il2CppScheduleOne.UI.Shop;
-using Il2CppScheduleOne.Money;
-using Il2CppScheduleOne.ObjectScripts.Cash;
+using Il2CppScheduleOne.UI.Items;
+using System.Reflection;
+using System.Reflection.Emit;
+
 
 [assembly: MelonInfo(typeof(BetterStacksMod), "Better Stacks", "2.0.2", "Zarnes")]
 [assembly: MelonGame("TVGS", "Schedule I")]
@@ -27,6 +29,12 @@ public class BetterStacksMod : MelonMod
         _config = LoadConfig();
 
         var harmony = new HarmonyLib.Harmony("com.zarnes.betterstacks");
+        FileLog.LogWriter = new StreamWriter("harmony.log") { AutoFlush = true };
+
+        var method = AccessTools.Method(typeof(ItemUIManager), "UpdateCashDragAmount");
+        method = AccessTools.Method(typeof(ItemUIManager), "StartDragCash");
+        method = AccessTools.Method(typeof(ItemUIManager), "EndCashDrag");
+
 
         // Patch StackLimit
         harmony.Patch(
@@ -79,6 +87,21 @@ public class BetterStacksMod : MelonMod
         //    AccessTools.Method(typeof(ItemSlot), "AddItem"),
         //    postfix: new HarmonyMethod(typeof(BetterStacksMod), nameof(Patch_ItemSlot_AddItem))
         //);
+
+        harmony.Patch(
+            AccessTools.Method(typeof(ItemUIManager), "UpdateCashDragAmount"),
+            transpiler: new HarmonyMethod(typeof(BetterStacksMod), nameof(TranspilerPatch))
+        );
+        harmony.Patch(
+            AccessTools.Method(typeof(ItemUIManager), "StartDragCash"),
+            transpiler: new HarmonyMethod(typeof(BetterStacksMod), nameof(TranspilerPatch))
+        );
+        harmony.Patch(
+            AccessTools.Method(typeof(ItemUIManager), "EndCashDrag"),
+            transpiler: new HarmonyMethod(typeof(BetterStacksMod), nameof(TranspilerPatch))
+        );
+
+        //harmony.PatchAll();
 
     }
 
@@ -246,7 +269,85 @@ public class BetterStacksMod : MelonMod
                 return 1;
         }
     }
+
+    static IEnumerable<CodeInstruction> TranspilerPatch(IEnumerable<CodeInstruction> instructions)
+    {
+        MelonLogger.Msg("Transpiler called");
+        foreach (var instruction in instructions)
+        {
+            MelonLogger.Msg($"Opcode: {instruction.opcode}, Operand: {instruction.operand}");
+            if (instruction.opcode == OpCodes.Ldc_R4 && (float)instruction.operand == 1000f)
+                yield return new CodeInstruction(OpCodes.Ldc_R4, (float)5000);
+            else
+                yield return instruction;
+        }
+    }
+
+    //[HarmonyTargetMethods]
+    //public static IEnumerable<MethodBase> GetPatches()
+    //{
+    //    yield return AccessTools.Method(typeof(ItemUIManager), nameof(ItemUIManager.UpdateCashDragAmount));
+    //    yield return AccessTools.Method(typeof(ItemUIManager), nameof(ItemUIManager.StartDragCash));
+    //    yield return AccessTools.Method(typeof(ItemUIManager), nameof(ItemUIManager.EndCashDrag));
+    //}
+
+    //[HarmonyTranspiler]
+    //static IEnumerable<CodeInstruction> TranspilerPatch(IEnumerable<CodeInstruction> instructions)
+    //{
+    //    MelonLogger.Msg("----------------");
+    //    MelonLogger.Msg("Transpiler called");
+    //    foreach (var instruction in instructions)
+    //    {
+    //        if (instruction.opcode == OpCodes.Ldc_R4 && (float)instruction.operand == 1000f)
+    //            yield return new CodeInstruction(OpCodes.Ldc_R4, (float)5000);
+    //        else
+    //            yield return instruction;
+    //    }
+    //}
 }
+
+//[HarmonyPatch]
+//public static class Const_Patches
+//{
+//    [HarmonyTargetMethods]
+//    public static IEnumerable<MethodBase> GetPatches()
+//    {
+//        yield return AccessTools.Method(typeof(ItemUIManager), nameof(ItemUIManager.UpdateCashDragAmount));
+//        yield return AccessTools.Method(typeof(ItemUIManager), nameof(ItemUIManager.StartDragCash));
+//        yield return AccessTools.Method(typeof(ItemUIManager), nameof(ItemUIManager.EndCashDrag));
+//    }
+
+//    [HarmonyTranspiler]
+//    static IEnumerable<CodeInstruction> TranspilerPatch(IEnumerable<CodeInstruction> instructions)
+//    {
+//        MelonLogger.Msg("----------------");
+//        MelonLogger.Msg("Transpiler called");
+//        foreach (var instruction in instructions)
+//        {
+//            MelonLogger.Msg($"Opcode: {instruction.opcode}, Operand: {instruction.operand}");
+//            if (instruction.opcode == OpCodes.Ldc_R4 && (float)instruction.operand == 1000f)
+//                yield return new CodeInstruction(OpCodes.Ldc_R4, (float)5000);
+//            else
+//                yield return instruction;
+//        }
+//    }
+//}
+
+//[HarmonyPatch(typeof(ItemUIManager)), HarmonyPatchAll]
+//public static class Const_Patches
+//{
+//    [HarmonyTranspiler]
+//    static IEnumerable<CodeInstruction> TranspilerPatch(IEnumerable<CodeInstruction> instructions)
+//    {
+//        foreach (var ins in instructions)
+//        {
+//            if (ins.opcode == OpCodes.Ldc_R4 && (float)ins.operand == 1000f)
+//                yield return new CodeInstruction(OpCodes.Ldc_R4, (float)5000);
+//            else
+//                yield return ins;
+//        }
+//    }
+//}
 
 public class ModConfig
 {
