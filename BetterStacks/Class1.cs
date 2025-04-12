@@ -12,7 +12,7 @@ using Il2CppScheduleOne.UI.Shop;
 using Il2CppScheduleOne.Money;
 using Il2CppScheduleOne.ObjectScripts.Cash;
 
-[assembly: MelonInfo(typeof(BetterStacksMod), "Better Stacks", "2.0.0", "Zarnes")]
+[assembly: MelonInfo(typeof(BetterStacksMod), "Better Stacks", "2.0.2", "Zarnes")]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
 namespace BetterStacks;
