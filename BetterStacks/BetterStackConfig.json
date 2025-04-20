@@ -12,8 +12,10 @@
 "Decoration": 1,
 "Clothing": 1,
 
+"CocaLeaf": 2,
+
 "MixingStationCapacity": 1,
-"MixingStationSpeed": 3,
+"MixingStationSpeed": 1,
 
 "DryingRackCapacity": 1
 }

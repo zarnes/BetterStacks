@@ -14,7 +14,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 
 
-[assembly: MelonInfo(typeof(BetterStacksMod), "Better Stacks", "2.0.2", "Zarnes")]
+[assembly: MelonInfo(typeof(BetterStacksMod), "Better Stacks", "2.1.0", "Zarnes")]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
 namespace BetterStacks;
@@ -23,6 +23,7 @@ public class BetterStacksMod : MelonMod
 {
     private static ModConfig _config = new ModConfig();
     private static HashSet<ItemDefinition> _alreadyModifiedItems = new HashSet<ItemDefinition>();
+    private static HashSet<string> _alreadyLoggedItems = new HashSet<string>();
 
     public override void OnInitializeMelon()
     {
@@ -146,17 +147,21 @@ public class BetterStacksMod : MelonMod
     {
         if (!_alreadyModifiedItems.Contains(__instance.Definition))
         {
-            EItemCategory cat = __instance.Category;
-            __result *= GetCapacityModifier(cat);
-            //if (__instance.Name == "Cash") // TODO remove
-            //{
-            //    __result *= 2;
-            //}
-            //else
-            //{
-            //    __result *= GetCapacityModifier(cat);
-            //}
-            //MelonLogger.Msg($"{__instance.Name} stack modified to {__result}");
+            if (__instance.Name == "Coca Leaf")
+            {
+                __result *= _config.CocaLeaf;
+            }
+            else
+            {
+                EItemCategory category = __instance.Name == "Coca Leaf" ? EItemCategory.Product : __instance.Category;
+                __result *= GetCapacityModifier(category);
+            }
+
+            if (!_alreadyLoggedItems.Contains(__instance.Name))
+            {
+                MelonLogger.Msg($"[Better Stacks] {__instance.Name} stack ({__instance.Category}) modified to {__result}");
+                _alreadyLoggedItems.Add(__instance.Name);
+            }
         }
     }
 
@@ -192,6 +197,7 @@ public class BetterStacksMod : MelonMod
     public static bool PatchMixingStationCapacity(MixingStation __instance)
     {
         __instance.MixTimePerItem /= _config.MixingStationSpeed;
+        __instance.MixTimePerItem = Math.Max(1, __instance.MixTimePerItem);
         __instance.MaxMixQuantity = __instance.MaxMixQuantity * _config.MixingStationCapacity;
         //MelonLogger.Msg($"Set mixing station capacity to {__instance.MaxMixQuantity}");
         return true;
@@ -207,23 +213,23 @@ public class BetterStacksMod : MelonMod
         }
     }
 
-    public static bool DeliveryLimitPatch(DeliveryShop __instance)
-    {
-        int totalStacks = 0;
-        foreach (ListingEntry? listingEntry in __instance.listingEntries._items)
-        {
-            if (listingEntry is null || listingEntry.SelectedQuantity == 0)
-                continue;
+    //public static bool DeliveryLimitPatch(DeliveryShop __instance)
+    //{
+    //    int totalStacks = 0;
+    //    foreach (ListingEntry? listingEntry in __instance.listingEntries._items)
+    //    {
+    //        if (listingEntry is null || listingEntry.SelectedQuantity == 0)
+    //            continue;
 
-            StorableItemDefinition item = listingEntry.MatchingListing.Item;
-            int stackCapacity = item.StackLimit * GetCapacityModifier(item.Category);
-            int stacksNeeded = (int) Math.Ceiling((double)listingEntry.SelectedQuantity / stackCapacity);
-            totalStacks += stacksNeeded;
-        }
+    //        StorableItemDefinition item = listingEntry.MatchingListing.Item;
+    //        int stackCapacity = item.StackLimit * GetCapacityModifier(item.Category);
+    //        int stacksNeeded = (int) Math.Ceiling((double)listingEntry.SelectedQuantity / stackCapacity);
+    //        totalStacks += stacksNeeded;
+    //    }
 
-        MelonLogger.Msg($"Order need {totalStacks} stacks");
-        return totalStacks <= DeliveryShop.DELIVERY_VEHICLE_SLOT_CAPACITY;
-    }
+    //    MelonLogger.Msg($"Order need {totalStacks} stacks");
+    //    return totalStacks <= DeliveryShop.DELIVERY_VEHICLE_SLOT_CAPACITY;
+    //}
 
     public static void InitializeListingEntryPatch(ListingEntry __instance, ShopListing match)
     {
@@ -232,8 +238,9 @@ public class BetterStacksMod : MelonMod
         {
             _alreadyModifiedItems.Add(item);
             int originalStackLimit = item.StackLimit;
-            item.StackLimit = originalStackLimit * GetCapacityModifier(item.Category);
-            MelonLogger.Msg($"Set {item.Name} shop listing stack limit from {originalStackLimit} to {item.StackLimit}");
+            EItemCategory category = item.Name == "Speed Grow" ? EItemCategory.Growing : item.Category;
+            item.StackLimit = originalStackLimit * GetCapacityModifier(category);
+            MelonLogger.Msg($"[Better Stacks] Set {item.Name} ({item.Category}) shop listing stack limit from {originalStackLimit} to {item.StackLimit}");
         }
     }
 
@@ -272,8 +279,8 @@ public class BetterStacksMod : MelonMod
 
     static IEnumerable<CodeInstruction> TranspilerPatch(IEnumerable<CodeInstruction> instructions)
     {
-        MelonLogger.Msg("Transpiler called");
-        foreach (var instruction in instructions)
+        MelonLogger.Msg("[Better Stacks] Transpiler called");
+        foreach (CodeInstruction instruction in instructions)
         {
             MelonLogger.Msg($"Opcode: {instruction.opcode}, Operand: {instruction.operand}");
             if (instruction.opcode == OpCodes.Ldc_R4 && (float)instruction.operand == 1000f)
@@ -363,6 +370,8 @@ public class ModConfig
     public int Ingredient { get; set; } = 1;
     public int Decoration { get; set; } = 1;
     public int Clothing { get; set; } = 1;
+
+    public int CocaLeaf { get; set; } = 1;
 
     public int MixingStationCapacity { get; set; } = 1;
     public int MixingStationSpeed { get; set; } = 3;
